@@ -5,7 +5,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
-from debug_figure import DebugFigureCurve, DebugFigureSubplot, DebugFigure
+from debug_figure import CursorInfo, DebugFigureCurve, DebugFigureSubplot, DebugFigure
+
+TOOL_VERSION = "DEBUG_PLOT 240907"
 
 def main():
     plt.rcParams['toolbar'] = 'None'
@@ -17,6 +19,12 @@ def main():
     obj_at      = np.random.normal(1, 0.3, timestamp.shape[0])
     dis         = np.random.normal(100, 10, timestamp.shape[0])
     dis2        = np.random.normal(95, 10, timestamp.shape[0])
+    tar_id      = np.arange(0, timestamp.shape[0], 1)
+
+    # 鼠标点击标签上显示的信息
+    cursor_info = CursorInfo()
+    cursor_info.add_info(name='timestamp', data=timestamp)
+    cursor_info.add_info(name='objective id', data=tar_id)
 
     ref_v_real_sc    = DebugFigureCurve(ref_v_real,  'PlanVel', 'tab:blue', True)
     obj_v_sc         = DebugFigureCurve(obj_v,       'ObjVel',  'tab:red',  True)
@@ -24,10 +32,10 @@ def main():
     obj_at_sc        = DebugFigureCurve(obj_at,      'ObjAcc',  'tab:red',  True)
     dis_sc           = DebugFigureCurve(dis,         'Dis',     'tab:blue', True)
     dis2_sc          = DebugFigureCurve(dis2,        'Dis2',    'tab:red',  True)
-    vel_subplot      = DebugFigureSubplot(name='Velocity    ', x_axis_data=timestamp)
-    acc_subplot      = DebugFigureSubplot(name='Acceleration', x_axis_data=timestamp)
-    dis_subplot      = DebugFigureSubplot(name='Distance    ', x_axis_data=timestamp)
-    lon_debug_figure = DebugFigure("longitude debug")
+    vel_subplot      = DebugFigureSubplot(name='Velocity    ', x_axis_data=timestamp, cursor_info=cursor_info)
+    acc_subplot      = DebugFigureSubplot(name='Acceleration', x_axis_data=timestamp, cursor_info=cursor_info)
+    dis_subplot      = DebugFigureSubplot(name='Distance    ', x_axis_data=timestamp, cursor_info=cursor_info)
+    lon_debug_figure = DebugFigure(TOOL_VERSION)
 
     vel_subplot.add_curve(ref_v_real_sc)
     vel_subplot.add_curve(obj_v_sc)
