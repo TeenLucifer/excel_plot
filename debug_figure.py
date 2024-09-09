@@ -11,6 +11,7 @@ from matplotlib.widgets import CheckButtons
 from matplotlib.widgets import Button
 #·计算相关模块
 import numpy as np
+import pandas as pd
 from collections import deque
 
 """鼠标点击标签信息类
@@ -61,6 +62,276 @@ class DebugFigureCurve:
     def set_visible(self, visible):
         self.visible = visible
         self.line.set_visible(visible)
+
+class DebugFigureBasePlot:
+    def __init__(
+        self,
+        name: str,
+        fig: matplotlib.figure.Figure,
+        cursor_info: CursorInfo = None,
+        mouse_event_callback = None
+    ) -> None:
+        self.fig = fig
+        self.name = name
+        self.x_axis_data: np.ndarray
+        self.xticks_density = 30 # 本图横轴刻度密度
+
+        # 画布及坐标轴相关参数
+        self.plot_ax_pos: np.ndarray
+        self.plot_ax: matplotlib.axes.Axes
+
+        # 图中的曲线
+        self.curve_num = 0
+        self.curves: list[DebugFigureCurve] = []
+
+        # 是否可见
+        self.visible = True
+
+        # 绑定鼠标事件响应函数
+        self.fig.canvas.mpl_connect('scroll_event',         self.mouse_toggle_event)
+        self.fig.canvas.mpl_connect('button_press_event',   self.mouse_toggle_event)
+        self.fig.canvas.mpl_connect('button_release_event', self.mouse_toggle_event)
+        self.fig.canvas.mpl_connect('motion_notify_event',  self.mouse_toggle_event)
+        # 本图鼠标点击事件参数
+        self.mouse_press = False
+        self.mouse_move_start_x = 0
+        self.mouse_move_start_y = 0
+        self.mouse_move_rx = 0.0   # 鼠标移动横向比例, 用于和其它子图同步
+        self.mouse_move_ry = 0.0   # 鼠标移动纵向比例, 用于和其它子图同步
+        self.mouse_scroll_rx = 1.0 # 鼠标滚轮横向缩放比例, 用于和其它子图同步
+        self.mouse_scroll_ry = 1.0 # 鼠标滚轮纵向缩放比例, 用于和其它子图同步
+        self.mouse_event_callback = mouse_event_callback
+        self.cursor_info: CursorInfo = cursor_info # 鼠标点击信息
+        self.cursor: mplcursors._mplcursors.Cursor # 标签
+
+    def set_widgets(
+        self,
+        plot_ax_pos: np.ndarray
+    ) -> None:
+        self.plot_ax_pos = plot_ax_pos
+        self.plot_ax = self.fig.add_axes(self.plot_ax_pos)
+
+    # 绘制曲线
+    def plot_curve(
+        self,
+        x_axis_data: np.ndarray
+    ) -> None:
+        self.x_axis_data = x_axis_data
+        lines = []
+        for curve in self.curves:
+            curve.plot(self.plot_ax, self.x_axis_data)
+            lines.append(curve.line)
+        # 给一幅子图绑定标签, 每条曲线都绑定会有重叠现象, 故只绑定一次
+        self.cursor = mplcursors.cursor(lines, multiple=True)
+        self.cursor.connect('add', self.update_cursor_annotation)
+
+        # 设置显示形式
+        self.plot_ax.set_xlim(self.x_axis_data.min(), self.x_axis_data.max())
+        self.plot_ax.legend(fontsize=8)
+        self.plot_ax.grid()
+        self.plot_ax.set_xticks(np.linspace(self.x_axis_data.min(), self.x_axis_data.max(), self.xticks_density))
+        self.plot_ax.tick_params(axis='x', rotation=20)
+        self.plot_ax.ticklabel_format(axis='x', style='plain')
+
+        # 曲线绘制时设置invisible会导致legend不显示颜色, 因此需要先绘制曲线再设置visible
+        for curve in self.curves:
+            curve.set_visible(curve.visible)
+
+    # 添加曲线
+    def add_curve(
+        self,
+        curve: DebugFigureCurve,
+    ) -> None:
+        self.curves.append(curve)
+        self.curve_num += 1
+
+    # 标签信息更新函数
+    def update_cursor_annotation(self, cursor: mplcursors._mplcursors.Cursor) -> None:
+        cursor_text = f'{cursor.artist.get_label()}:{cursor.target[1]:.2f}'
+        index = round(cursor.index)
+        info = ''
+        if self.cursor_info is not None:
+            for i in range(self.cursor_info.info_num):
+                name = self.cursor_info.info_name_list[i]
+                data = self.cursor_info.info_data_list[i][index]
+                info = f'\n{name}:{data}'
+                cursor_text += info
+        cursor.annotation.set_text(cursor_text)
+
+    # 本图鼠标事件回调函数
+    # 右键按住拖动, 滚轮缩放, 左键点击显示时间同步竖线
+    def mouse_toggle_event(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        if self.plot_ax == event.inaxes and \
+           (event.name == 'button_press_event' or event.name == 'scroll_event' or\
+            event.name == 'button_press_event' or event.name == 'button_release_event' or \
+            (event.name == 'motion_notify_event' and event.button == 3 and self.mouse_press == True)):
+            # 获取本图横纵轴范围
+            x_min, x_max = self.plot_ax.get_xlim()
+            y_min, y_max = self.plot_ax.get_ylim()
+            subplot_width = x_max - x_min
+            subplot_height = y_max - y_min
+            updated_x_min = x_min
+            updated_x_max = x_max
+            updated_y_min = y_min
+            updated_y_max = y_max
+
+            # 滚轮缩放事件响应
+            if event.name == 'scroll_event':
+                scale_factor = 0.9 if event.button == 'up' else 1.1
+                fig_width_px, fig_height_px = self.fig.canvas.get_width_height()
+
+                if event.xdata > (x_min + subplot_width / 5.0):
+                    self.mouse_scroll_rx = scale_factor # 横轴缩放系数
+                    self.mouse_scroll_ry = 1.0          # 纵轴缩放系数
+
+                    # 横轴缩放参数
+                    x_mid = (x_max + x_min) / 2.0
+                    updated_x_min = x_mid - (subplot_width / 2.0) * self.mouse_scroll_rx
+                    updated_x_max = x_mid + (subplot_width / 2.0) * self.mouse_scroll_rx
+                else:
+                    self.mouse_scroll_rx = 1.0          # 横轴缩放系数
+                    self.mouse_scroll_ry = scale_factor # 纵轴缩放系数
+
+                    # 纵轴缩放参数
+                    y_mid = (y_max + y_min) / 2.0
+                    updated_y_min = y_mid - (subplot_height / 2.0) * self.mouse_scroll_ry
+                    updated_y_max = y_mid + (subplot_height / 2.0) * self.mouse_scroll_ry
+
+            # 鼠标拖动事件响应
+            if event.name == 'button_press_event' and event.button == 3:
+                self.mouse_press = True
+                self.mouse_move_start_x = event.xdata
+                self.mouse_move_start_y = event.ydata
+            elif event.name == 'button_release_event' and event.button == 3:
+                self.mouse_press = False
+            elif event.name == 'motion_notify_event' and event.button == 3 and self.mouse_press:
+                mx = event.xdata - self.mouse_move_start_x
+                my = event.ydata - self.mouse_move_start_y
+                self.mouse_move_rx = mx / subplot_width
+                self.mouse_move_ry = my / subplot_height
+
+                updated_x_min = x_min - mx
+                updated_x_max = x_min - mx + subplot_width
+                updated_y_min = y_min - my
+                updated_y_max = y_min - my + subplot_height
+            
+            self.plot_ax.set_xlim(updated_x_min, updated_x_max)
+            self.plot_ax.set_ylim(updated_y_min, updated_y_max)
+            self.plot_ax.set_xticks(np.linspace(updated_x_min, updated_x_max, self.xticks_density))
+
+            if (self.mouse_event_callback is not None) and (event.name == 'scroll_event' or (event.name == 'motion_notify_event' and self.mouse_press) or\
+                (event.name == 'button_press_event' and event.button == 1)):
+                self.mouse_event_callback(self, event)
+
+            self.fig.canvas.draw_idle()
+
+class DebugFigureAnyPlot(DebugFigureBasePlot):
+    def __init__(
+        self,
+        name: str,
+        fig: matplotlib.figure.Figure,
+        data_frame: pd.DataFrame
+    ) -> None:
+        super().__init__(
+            name=name,
+            fig=fig,
+            cursor_info=None,
+            mouse_event_callback=None
+        )
+
+        self.color_tab: list[str] = ['tab:blue', 'tab:red', 'tab:green', 'tab:orange', 'tab:purple', 'tab:brown', 'tab:pink', 'tab:gray', 'tab:olive', 'tab:cyan']
+        self.button_ax_pos: np.ndarray
+        self.check_buttons_ax_pos: np.ndarray
+        self.button_ax: matplotlib.axes.Axes
+        self.check_buttons_ax: matplotlib.axes.Axes
+        self.button: matplotlib.widgets.Button
+        self.check_buttons: matplotlib.widgets.CheckButtons
+        self.check_buttons_labels: list[str] = data_frame.columns
+        self.data_frame = data_frame
+        self.x_flag = False
+        self.x_label = ""
+
+    def set_widgets(
+        self,
+        plot_ax_pos: np.ndarray,
+        button_ax_pos: np.ndarray,
+        check_buttons_ax_pos: np.ndarray
+    ) -> None:
+        self.plot_ax_pos = plot_ax_pos
+        self.plot_ax = self.fig.add_axes(self.plot_ax_pos)
+        self.button_ax_pos = button_ax_pos
+        self.button_ax = self.fig.add_axes(self.button_ax_pos)
+        self.check_buttons_ax_pos = check_buttons_ax_pos
+        self.check_buttons_ax = self.fig.add_axes(self.check_buttons_ax_pos)
+        self.button = Button(ax=self.button_ax, label=self.name)
+        self.check_buttons = CheckButtons(ax=self.check_buttons_ax, labels=self.check_buttons_labels)
+        self.check_buttons.on_clicked(self.checkbuttons_toggle_event) # 绑定复选框回调函数
+
+        i = 0
+        for label in self.data_frame.columns:
+            color = self.color_tab[i]
+            curve = DebugFigureCurve(
+                y_axis_data=self.data_frame[label].values,
+                label=label,
+                color=color,
+                visible=False
+            )
+            self.add_curve(curve)
+            i += 1
+
+    # 本图复选框勾选回调函数
+    # 复选框勾选曲线显示或隐藏
+    def checkbuttons_toggle_event(self, label: str) -> None:
+        index = [curve.label for curve in self.curves].index(label)
+        if False == self.x_flag:
+            self.x_flag = True
+            self.x_label = self.curves[index].label
+            self.x_axis_data = self.curves[index].y_axis_data
+            self.plot_curve(self.x_axis_data)
+            return
+        elif True == self.x_flag and self.x_label == self.curves[index].label:
+            self.x_flag = False
+            self.x_label = ""
+            self.plot_ax.clear()
+            # clear
+            #for curve in self.curves:
+            #    if curve.label == self.x_label:
+            #        continue
+            #    curve.visible = False
+            #    curve.set_visible(curve.visible)
+            #self.fig.canvas.draw_idle()
+            return
+
+        self.curves[index].visible = not self.curves[index].visible
+        self.curves[index].set_visible(self.curves[index].visible)
+        self.fig.canvas.draw_idle()
+
+class DebugFigureSubplot_(DebugFigureBasePlot):
+    def __init__(
+        self,
+        name: str,
+        fig: matplotlib.figure.Figure,
+        plot_ax_pos: np.ndarray,
+        cursor_info: CursorInfo,
+        mouse_event_callback,
+        button_event_callback,
+    ) -> None:
+        # 调用父类构造函数
+        super().__init__(name, fig, plot_ax_pos, cursor_info, mouse_event_callback)
+
+        self.button_ax_pos: np.ndarray
+        self.check_buttons_ax_pos: np.ndarray
+        self.button_ax: matplotlib.axes.Axes
+        self.button: matplotlib.widgets.Button
+        self.check_buttons_ax: matplotlib.axes.Axes
+        self.check_buttons: matplotlib.widgets.CheckButtons
+
+        self.button_event_callback = button_event_callback # 按键点击事件回调函数, 调用外部相应函数
+        self.vline: matplotlib.lines.Line2D = None         # 鼠标点击显示竖线
+    
+    def button_toggle_event(self, event) -> None:
+        if self.button_event_callback is not None:
+            self.button_event_callback(self)
 
 """debug绘图子图类
 功能:
