@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 import tkinter as tk
 from tkinter import filedialog
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-from excel_plot.debug_figure import CursorInfo, DebugFigureCurve, DebugFigureSubplot, DebugFigure
+from excel_plot.debug_figure import CursorInfo, ExcelPlotCurve, ExcelPlotSubfigure, ExcelPlotUi
 
 TOOL_VERSION = "DEBUG_PLOT_TOOL 240907"
 
@@ -27,16 +27,16 @@ def main():
     cursor_info.add_info(name='timestamp', data=timestamp)
     cursor_info.add_info(name='objective id', data=tar_id)
 
-    ref_v_real_sc    = DebugFigureCurve(ref_v_real,  'PlanVel', 'tab:blue', True)
-    obj_v_sc         = DebugFigureCurve(obj_v,       'ObjVel',  'tab:red',  True)
-    ref_at_real_sc   = DebugFigureCurve(ref_at_real, 'PlanAcc', 'tab:blue', True)
-    obj_at_sc        = DebugFigureCurve(obj_at,      'ObjAcc',  'tab:red',  True)
-    dis_sc           = DebugFigureCurve(dis,         'Dis',     'tab:blue', True)
-    dis2_sc          = DebugFigureCurve(dis2,        'Dis2',    'tab:red',  True)
-    vel_subplot      = DebugFigureSubplot(name='Velocity    ', x_axis_data=timestamp, cursor_info=cursor_info)
-    acc_subplot      = DebugFigureSubplot(name='Acceleration', x_axis_data=timestamp, cursor_info=cursor_info)
-    dis_subplot      = DebugFigureSubplot(name='Distance    ', x_axis_data=timestamp, cursor_info=cursor_info)
-    lon_debug_figure = DebugFigure(TOOL_VERSION)
+    ref_v_real_sc    = ExcelPlotCurve(ref_v_real,  'PlanVel', 'tab:blue', True)
+    obj_v_sc         = ExcelPlotCurve(obj_v,       'ObjVel',  'tab:red',  True)
+    ref_at_real_sc   = ExcelPlotCurve(ref_at_real, 'PlanAcc', 'tab:blue', True)
+    obj_at_sc        = ExcelPlotCurve(obj_at,      'ObjAcc',  'tab:red',  True)
+    dis_sc           = ExcelPlotCurve(dis,         'Dis',     'tab:blue', True)
+    dis2_sc          = ExcelPlotCurve(dis2,        'Dis2',    'tab:red',  True)
+    vel_subplot      = ExcelPlotSubfigure(name='Velocity    ', cursor_info=cursor_info)
+    acc_subplot      = ExcelPlotSubfigure(name='Acceleration', cursor_info=cursor_info)
+    dis_subplot      = ExcelPlotSubfigure(name='Distance    ', cursor_info=cursor_info)
+    lon_debug_figure = ExcelPlotUi(TOOL_VERSION)
 
     vel_subplot.add_curve(ref_v_real_sc)
     vel_subplot.add_curve(obj_v_sc)
@@ -48,7 +48,7 @@ def main():
     lon_debug_figure.add_subplot(acc_subplot)
     lon_debug_figure.add_subplot(dis_subplot)
 
-    lon_debug_figure.plot("Velocity")
+    lon_debug_figure.plot("Velocity", timestamp)
     plt.show()
 
 if __name__ == '__main__':
