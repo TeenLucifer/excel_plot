@@ -14,6 +14,7 @@ import numpy as np
 import pandas as pd
 from collections import deque
 # 路径相关模块
+import sys
 import tkinter as tk
 from tkinter import filedialog
 
@@ -392,6 +393,32 @@ class ExcelPlotUi:
 
         self.y_sync = False # 同画布下多个子图是否同步纵轴
 
+    def open_file(self) -> pd.DataFrame:
+        """
+        打开对话框选择文件
+        """
+        root = tk.Tk()
+        root.withdraw()
+        file_path = filedialog.askopenfilename()
+        data_frame: pd.DataFrame
+        try:
+            data_frame = pd.read_csv(file_path)
+            print("Read file successfully!")
+        except pd.errors.ParserError:
+            print("CSV file format error!")
+            sys.exit(1)
+        except FileNotFoundError:
+            print("File Not Found!")
+            sys.exit(1)
+        except Exception as e:
+            try:
+                data_frame = pd.read_excel(file_path)
+                print("Read file successfully!")
+            except pd.errors.ParserError:
+                print(f"Read file failed: {e}!")
+                sys.exit(1)
+        return data_frame
+
     def add_subplot(self, subplot: ExcelPlotSubfigure) -> None:
         """
         大图添加子图
@@ -532,38 +559,74 @@ class ExcelPlotUi:
         self.fig.canvas.draw_idle()
 
 class ExcelPlotUiMini(ExcelPlotBaseFigure):
-    def __init__(
-        self,
-        name: str,
-        fig: matplotlib.figure.Figure,
-        plot_ax_pos: np.ndarray,
-        button_ax_pos: np.ndarray,
-        check_buttons_ax_pos: np.ndarray,
-        data_frame: pd.DataFrame
-    ) -> None:
+    """
+    excel数据绘图工具, 继承于绘图基类
+    功能:
+        点击按键打开任意数据文件
+        点击复选框显示或隐藏某条曲线
+        鼠标左键点击曲线显示标签信息
+        鼠标右键按住空白处拖动移动
+        鼠标滚轮缩放
+    """
+    def __init__(self, name: str, fig: matplotlib.figure.Figure) -> None:
         super().__init__(name=name, fig=fig, cursor_info=None, mouse_event_callback=None)
 
-        self.data_frame = data_frame
-        self.check_buttons_labels: list[str] = data_frame.columns
-        self.button_ax_pos = plot_ax_pos
-        self.button_ax_pos = button_ax_pos
-        self.check_buttons_ax_pos = check_buttons_ax_pos
-        self.plot_ax = self.fig.add_axes(self.plot_ax_pos)
-        self.button_ax = self.fig.add_axes(self.button_ax_pos)
+        self.data_frame: pd.DataFrame = None
+        self.check_buttons_labels: list[str] = None
+        self.plot_ax_pos           = [0.130, 0.05, 0.80, 0.89]
+        self.button_ax_pos        = [0.005, 0.95, 0.10, 0.03]
+        self.check_buttons_ax_pos = [0.005, 0.05, 0.10, 0.89]
+        self.plot_ax          = self.fig.add_axes(self.plot_ax_pos)
+        self.button_ax        = self.fig.add_axes(self.button_ax_pos)
         self.check_buttons_ax = self.fig.add_axes(self.check_buttons_ax_pos)
-        self.button = Button(ax=self.button_ax, label=self.name)
-        self.check_buttons = CheckButtons(ax=self.check_buttons_ax, labels=self.check_buttons_labels)
 
+        # 创建控件
+        self.button = Button(ax=self.button_ax, label="Open File")
         self.button.on_clicked(self.button_toggle_event)
-        self.check_buttons.on_clicked(self.checkbuttons_toggle_event)
-
+        self.check_buttons: CheckButtons = None
         self.vline: matplotlib.lines.Line2D = None
 
         self.is_x_choosed = False
         self.x_label = ""
         self.curves: list[ExcelPlotCurve] = []
 
+    def open_file(self) -> None:
+        """
+        打开对话框选择文件
+        """
+        root = tk.Tk()
+        root.withdraw()
+        file_path = filedialog.askopenfilename()
+        data_frame: pd.DataFrame
+        try:
+            data_frame = pd.read_csv(file_path)
+            print("Read file successfully!")
+        except pd.errors.ParserError:
+            print("CSV file format error!")
+            sys.exit(1)
+        except FileNotFoundError:
+            print("File Not Found!")
+            sys.exit(1)
+        except Exception as e:
+            try:
+                data_frame = pd.read_excel(file_path)
+                print("Read file successfully!")
+            except pd.errors.ParserError:
+                print(f"Read file failed: {e}!")
+                sys.exit(1)
+
+        # 重置checkbuttons控件
+        self.check_buttons_ax.remove()
+        self.check_buttons_labels = data_frame.columns
+        self.check_buttons_ax = self.fig.add_axes(self.check_buttons_ax_pos)
+        self.check_buttons = CheckButtons(ax=self.check_buttons_ax, labels=self.check_buttons_labels)
+        self.check_buttons.on_clicked(self.checkbuttons_toggle_event)
+        self.data_frame = data_frame
+
     def plot(self, x_axis_data: np.ndarray) -> None:
+        """
+        绘制曲线
+        """
         self.x_axis_data = x_axis_data
         lines = []
         for curve in self.curves:
@@ -582,52 +645,45 @@ class ExcelPlotUiMini(ExcelPlotBaseFigure):
         self.plot_ax.ticklabel_format(axis='x', style='plain')
 
     def button_toggle_event(self, event) -> None:
+        """
+        按键触发函数, 打开对话框选择数据文件
+        """
         if self.button_ax == event.inaxes:
-            root = tk.Tk()
-            root.withdraw()
-            filepath = filedialog.askopenfilename()
-            data_frame: pd.DataFrame
-            read_success = False
-            try:
-                data_frame = pd.read_csv(filepath)
-                read_success = True
-                print("Read file successfully!")
-            except:
-                print("Read file failed!")
-
-            if True == read_success:
-                self.data_frame = data_frame
-                self.remove_all_curve()
-                self.plot_ax.clear()
-                self.is_x_choosed = False
-                self.x_label = ""
-
-                self.check_buttons.ax.remove()
-                self.check_buttons_labels = self.data_frame.columns
-                self.check_buttons_ax = self.fig.add_axes(self.check_buttons_ax_pos)
-                self.check_buttons = CheckButtons(ax=self.check_buttons_ax, labels=self.check_buttons_labels)
-                self.check_buttons.on_clicked(self.checkbuttons_toggle_event)
-                self.fig.canvas.draw_idle()
+            # 打开文件
+            self.open_file()
+            # 清楚图中曲线并重置状态
+            self.remove_all_curve()
+            self.plot_ax.clear()
+            self.is_x_choosed = False
+            self.x_label = ""
+            self.fig.canvas.draw_idle()
 
     def mouse_toggle_event(self, event: matplotlib.backend_bases.MouseEvent) -> None:
+        """
+        鼠标触发事件, 鼠标拖拽等交互
+        """
         super().mouse_toggle_event(event)
 
         if self.plot_ax == event.inaxes and \
            (event.name == 'button_press_event' or event.name == 'scroll_event' or\
             event.name == 'button_press_event' or event.name == 'button_release_event' or \
             (event.name == 'motion_notify_event' and event.button == 3 and self.mouse_press == True)):
+            # 有效操作才更新画布, 防止卡顿
             self.fig.canvas.draw_idle()
 
     # 本图复选框勾选回调函数
     # 复选框勾选曲线显示或隐藏
     def checkbuttons_toggle_event(self, label: str) -> None:
+        """
+        复选框勾选回调函数, 勾选曲线显示或隐藏: 第一个勾选的数据为横轴, 后面勾选的数据都为纵轴
+        """
         if False == self.is_x_choosed:
-            self.x_flag = True
+            self.is_x_choosed = True
             self.x_label = label
             self.x_axis_data = self.data_frame[label].values
             return
         elif True == self.is_x_choosed and label == self.x_label:
-            self.x_flag = False
+            self.is_x_choosed = False
             self.x_label = ""
             self.plot_ax.clear()
             return
