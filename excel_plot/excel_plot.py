@@ -674,6 +674,16 @@ class ExcelPlotUiMini(ExcelPlotBaseFigure):
            (event.name == 'button_press_event' or event.name == 'scroll_event' or\
             event.name == 'button_press_event' or event.name == 'button_release_event' or \
             (event.name == 'motion_notify_event' and event.button == 3 and self.mouse_press == True)):
+
+            if event.name == 'button_press_event' and event.button == 1:
+                for sel in self.cursor.selections:
+                    annotation = sel.annotation
+                    bbox = annotation.get_window_extent()
+                    if bbox.contains(event.x, event.y):
+                        return
+                if self.vline is not None:
+                    self.vline.remove()
+                self.vline = self.plot_ax.axvline(x=event.xdata, color='black', linewidth=1, visible=True)
             # 有效操作才更新画布, 防止卡顿
             self.fig.canvas.draw_idle()
 

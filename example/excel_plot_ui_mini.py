@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
 from excel_plot.excel_plot import ExcelPlotUiMini
 
-TOOL_VERSION = "ANY_PLOT_TOOL 241010"
+TOOL_VERSION = "ANY_PLOT_TOOL 241020"
 
 def main():
     # 创建mpl画布
