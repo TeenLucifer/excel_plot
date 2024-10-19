@@ -243,8 +243,7 @@ class ExcelPlotBaseFigure:
             self.plot_ax.set_ylim(updated_y_min, updated_y_max)
             self.plot_ax.set_xticks(np.linspace(updated_x_min, updated_x_max, self.xticks_density))
 
-            if (self.mouse_event_callback is not None) and (event.name == 'scroll_event' or (event.name == 'motion_notify_event' and self.mouse_press) or\
-                (event.name == 'button_press_event' and event.button == 1)):
+            if (self.mouse_event_callback is not None) and (event.name == 'scroll_event' or (event.name == 'motion_notify_event' and self.mouse_press) or (event.name == 'button_press_event' and event.button == 1)):
                 self.mouse_event_callback(self, event)
 
             #self.fig.canvas.draw_idle()
@@ -525,7 +524,14 @@ class ExcelPlotUi:
             updated_x_max = x_max
             updated_y_min = y_min
             updated_y_max = y_max
+
+            # 同步竖线
             if mouse_event.name == 'button_press_event' and mouse_event.button == 1:
+                for sel in major_subplot.cursor.selections:
+                    annotation = sel.annotation
+                    bbox = annotation.get_window_extent()
+                    if bbox.contains(mouse_event.x, mouse_event.y):
+                        return
                 if other_subplot.vline is not None:
                     other_subplot.vline.remove()
                 other_subplot.vline = other_subplot.plot_ax.axvline(x=mouse_event.xdata, color='black', linewidth=1, visible=True)

@@ -2,7 +2,7 @@ import os
 import sys
 import matplotlib.pyplot as plt
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../')))
-from excel_plot.debug_figure import CursorInfo, ExcelPlotCurve, ExcelPlotSubfigure, ExcelPlotUi
+from excel_plot.excel_plot import CursorInfo, ExcelPlotCurve, ExcelPlotSubfigure, ExcelPlotUi
 
 TOOL_VERSION = "DEBUG_PLOT_TOOL 241010"
 
