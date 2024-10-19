@@ -7,13 +7,13 @@ excel/txt自带的数据绘图功能交互性有限, 无法做到缩放/拖动/�
 
 1. 曲线绘图工具1
 
-读取**固定数据标签**的excel/txt数据, 不需要手动操作绘制, 脚本读取excel/txt一键完成.
-![](docs/excel_plot_ui.png)
+    读取**固定数据标签**的excel/txt数据, 不需要手动操作绘制, 脚本读取excel/txt一键完成.
+    ![](docs/excel_plot_ui.png)
 
 2. 曲线绘图工具2
 
-读取**任意数据标签**的excel/txt数据, 不需要在脚本中固定标签名称, 更加灵活.
-![](docs/excel_plot_ui_mini.png)
+    读取**任意数据标签**的excel/txt数据, 不需要在脚本中固定标签名称, 更加灵活.
+    ![](docs/excel_plot_ui_mini.png)
 
 ## 界面操作
 界面左侧为控件区域, 界面右侧是曲线显示区域.
@@ -35,7 +35,15 @@ excel/txt自带的数据绘图功能交互性有限, 无法做到缩放/拖动/�
 * 点击左侧复选框, 选中的第一个数据为横轴数据, 其余选中的数据都为纵轴数据.
 
 ## demo
-具体见[excel_plot_ui.py](example/excel_plot_ui.py)和[excel_plot_ui_mini.py](example/excel_plot_ui_mini.py)两个脚本文件.
+1. 安装依赖
+
+    ```
+    pip install -r requirements.txt
+    ```
+
+2. 调用脚本
+
+    具体见[excel_plot_ui.py](example/excel_plot_ui.py)和[excel_plot_ui_mini.py](example/excel_plot_ui_mini.py)两个脚本文件.
 
 ## 数据文件要求
 保存的数据文件第一行为表头, 每一列表示一种数据
